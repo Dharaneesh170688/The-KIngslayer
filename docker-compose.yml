@@ -1,0 +1,32 @@
+version: "3.8"
+
+services:
+  aegis-runtime:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: guardian-ai:latest
+    container_name: guardian-aegis-runtime
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount application folder for hot-reloads during dev
+      - ./app:/workspace/app
+      - ./configs:/workspace/configs
+      - ./contracts:/workspace/contracts
+      - ./storage:/workspace/storage
+      - ./logs:/workspace/logs
+    env_file:
+      - .env
+    environment:
+      - APP_ENV=dev
+      - DATABASE_URL=sqlite+aiosqlite:////workspace/storage/guardian.db
+      - LOG_FILE_PATH=/workspace/logs/guardian.log
+    healthcheck:
+      # Avoid dependency on curl by using standard python urllib for health check
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
