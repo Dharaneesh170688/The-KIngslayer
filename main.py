@@ -22,6 +22,8 @@ from app.services.database_service import DatabaseService
 from app.events.subscriber import setup_subscribers
 from app.services.embedding_service import embedding_service
 from app.services.detection_service import detection_service
+from app.services.behavior_service import behavior_service
+from app.database.session import async_session_maker
 
 # Initialize logging configuration immediately
 setup_logging()
@@ -44,6 +46,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         # 3. Eager load embedding model and pre-generate vector caches
         embedding_service.initialize()
         detection_service.initialize()
+
+        # 4. Eager load behavior engine baselines from database
+        async with async_session_maker() as db:
+            await behavior_service.initialize(db)
 
         logger.info("Aegis Runtime startup sequences completed successfully.")
         yield
@@ -142,19 +148,29 @@ def create_app() -> FastAPI:
     # 4. Mount versioned API routes
     application.include_router(v1_router, prefix="/api/v1")
 
-    # 5. Base Root welcome route
+    # 5. Serve high-fidelity SOC Dashboard UI at root /
     @application.get("/", tags=["General"])
-    async def root_welcome() -> dict:
+    async def root_welcome() -> Response:
         """
-        Server root welcomes clients and links to Swagger documentation.
+        Serves the Aegis SecOps Command Center Dashboard.
         """
-        return {
-            "message": "Welcome to GuardianAI Aegis Runtime (Phase 1 Infrastructure)",
-            "documentation": {
-                "swagger": "/docs",
-                "redoc": "/redoc"
-            }
-        }
+        import os
+        from fastapi.responses import HTMLResponse
+
+        template_path = "./app/templates/index.html"
+        try:
+            with open(template_path, "r", encoding="utf-8") as f:
+                html_content = f.read()
+            return HTMLResponse(content=html_content, status_code=status.HTTP_200_OK)
+        except Exception as err:
+            logger.error("Failed to read dashboard template: %s", err)
+            return JSONResponse(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                content={
+                    "error": "DASHBOARD_LOAD_FAILURE",
+                    "message": f"Could not load index.html console: {err}"
+                }
+            )
 
     return application
 

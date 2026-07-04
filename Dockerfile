@@ -54,6 +54,7 @@ COPY --from=builder /build/.venv /workspace/.venv
 COPY app/ /workspace/app/
 COPY configs/ /workspace/configs/
 COPY contracts/ /workspace/contracts/
+COPY scripts/ /workspace/scripts/
 COPY main.py /workspace/main.py
 
 ENV PATH="/workspace/.venv/bin:$PATH"
@@ -61,5 +62,5 @@ ENV PYTHONPATH="/workspace"
 
 EXPOSE 8000
 
-# Run FastAPI app with Uvicorn
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run migrations, then start FastAPI.
+CMD ["sh", "-c", "python scripts/migrate.py && uvicorn main:app --host 0.0.0.0 --port 8000"]
